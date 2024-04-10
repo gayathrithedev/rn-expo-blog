@@ -1,5 +1,5 @@
 // global imports
-import React, {useEffect, useState, useMemo } from 'react';
+import React, {useEffect, useState, useMemo, useCallback } from 'react';
 import { FlatList, View, Text, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 // third party imports
@@ -7,38 +7,44 @@ import axios from 'axios';
 import {useNavigation} from '@react-navigation/native';
 
 
+let loadMore = true;
+
 const AllPosts = () => {
 // state variables
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [count, setCount] = useState(0);
     const [page, setPage] = useState(1);
     const {navigate} = useNavigation();
+    const [isFetching, setIsFetching] = useState(false); // New state to track fetch status
+
 
 // fecth all post
-    const getPosts = () => {
-        setLoading(true);
-        axios.get(`https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`).then((response) => {
-            if(data?.length > 0) {
-                setData([...data, ...response.data]);
-            } else {
-                setData(response.data);
-            }
-            if(error) {
-                setError(null);
-            }
-    }).catch((error) => { 
-        setError(error); }).finally(() => { setLoading(false); });
-    }
+const fetchData = async (page) => {
+    const limit = 10;  // Adjust the limit as needed
+    const response = await fetch(`https://jsonplaceholder.typicode.com/posts?_limit=${limit}&_page=${page}`);
+    const totalCount = response.headers.get('X-Total-Count');
+    setCount(totalCount);
+    return response.json();
+  };
+  
 
 // useEffect to fetch all post
-    useEffect(() => {  
-        getPosts()
-    }, [page]);
-
-// navigate to ViewPost
-    const navigateToViewPost = (id) => navigate('ViewPost', {id})
-
+// add throttling to avoid multiple requests
+useEffect(() => {
+    const loadPageData = async () => {
+      if (!isFetching && !loading) {
+        setLoading(true);
+        setIsFetching(true);
+        const newData = await fetchData(page);
+        setData(currentData => [...currentData, ...newData]);
+        setLoading(false);
+        setIsFetching(false);
+      }
+    };
+    loadPageData();
+  }, [page]);
 
 // computed details for each item
     const useComputedDetails = (item) => {
@@ -52,11 +58,25 @@ const AllPosts = () => {
         }, [item]);
       };
 
+// handle on end reached ----> infinite scroll
+    const handleLoadMore = () => {
+        if(page<=10 && !isFetching) {
+            setPage(currentPage => currentPage + 1);
+        }
+    };
+
+
+// navigate to view post
+    const handleItemPress = useCallback((id) => {
+        navigate('ViewPost', { id })
+    }, []);
+
+
 // render item for list of posts
-    const RenderItem = ({ item }) => {
-        useComputedDetails(item);
+    const ListItemComponent = ({ item, onPress }) => {
+        // useComputedDetails(item);
         return (
-            <TouchableOpacity style={styles.listItems} onPress={() => navigateToViewPost(item.id)}>
+            <TouchableOpacity style={styles.listItems} onPress={() => onPress(item?.id)}>
                 <View style={styles.listItemWrapper}>
                 <View style={styles.idContainer}>
                     <Text style={styles.idText}>{item.id}</Text>
@@ -69,10 +89,10 @@ const AllPosts = () => {
         )
     }
 
-// handle on end reached ----> infinite scroll
-    const handleOnEndReached = () => {
-        setPage(page + 1);
-    }
+
+    const renderItem = useCallback(({ item }) => (
+        <ListItemComponent item={item} onPress={handleItemPress} />
+      ), []);
 
     return (
        <View style={styles.container}>
@@ -80,12 +100,12 @@ const AllPosts = () => {
         {error ? <Text style={styles.error}>{error.message}</Text> : null}
         <FlatList
             data={data}
-            renderItem={({item}) => <RenderItem item={item} />}
+            renderItem={renderItem}
             keyExtractor={item => item.id.toString()}
             style={styles.container}
-            onEndReached={() => handleOnEndReached()}
-            onEndReachedThreshold={0.7}
-            ListHeaderComponent={() => {loading ? <ActivityIndicator size="large" color="#000000" /> : null}}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={loading ? <ActivityIndicator size="large" color="#000000" /> : null}
         />
        </View>
     )
