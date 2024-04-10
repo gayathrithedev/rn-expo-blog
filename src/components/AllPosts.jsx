@@ -1,6 +1,7 @@
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
-import { FlatList, View, Text, ActivityIndicator, StyleSheet, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, View, Text, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import ViewPost from './ViewPost';
 
 
 
@@ -10,6 +11,8 @@ const AllPosts = () => {
     const [error, setError] = useState(null);
     const [page, setPage] = useState(1);
     const [count, setCount] = useState(0);
+    const [search, setSearch] = useState('');
+    const [activePost, setActivePost] = useState(0);
 
 
     const getPosts = () => {
@@ -32,16 +35,24 @@ const AllPosts = () => {
         getPosts()
     }, [page]);
 
+    const handleActivePost = useCallback((id) => { setActivePost(id) }, []);
+
     const renderItem = ({ item }) => {
+        console.log(activePost, item.id, 'use callback')
         return (
-            <View style={styles.listItems}>
+            <TouchableOpacity style={styles.listItems} onPress={() => handleActivePost(item.id)}>
+                <View style={styles.listItemWrapper}>
                 <View style={styles.idContainer}>
                     <Text style={styles.idText}>{item.id}</Text>
                 </View>
                 <View style={styles.listItemRight}>
                     <Text style={styles.titleText}>{item.title}</Text>
                 </View>
-            </View>
+                </View>
+                    {activePost === item.id ? (
+                        <ViewPost id={item?.id} />
+                    ): null}
+            </TouchableOpacity>
         )
     }
 
@@ -76,11 +87,13 @@ const styles = StyleSheet.create({
         fontSize: 18,
         textAlign: 'center'
     },
-    listItems: {
+    listItemWrapper: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    listItems: {
         padding: 12,
         backgroundColor: '#F4F7FB',
         borderRadius: 8,
@@ -109,10 +122,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 8
     },
-    descText: {
-        fontSize: 12,
-        fontWeight: '400'
-    },
     textInput: {
         borderColor: '#000000',
         borderWidth: 2,
@@ -120,6 +129,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         padding: 12,
         marginHorizontal: 24
-    }
+    },
 });
 export default AllPosts;
