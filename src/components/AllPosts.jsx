@@ -1,29 +1,29 @@
-import axios from 'axios';
-import React, { useCallback, useEffect, useState } from 'react';
+// global imports
+import React, {useEffect, useState, useMemo } from 'react';
 import { FlatList, View, Text, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import ViewPost from './ViewPost';
 
+// third party imports
+import axios from 'axios';
+import {useNavigation} from '@react-navigation/native';
 
 
 const AllPosts = () => {
+// state variables
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [page, setPage] = useState(1);
-    const [count, setCount] = useState(0);
-    const [search, setSearch] = useState('');
-    const [activePost, setActivePost] = useState(0);
+    const {navigate} = useNavigation();
 
-
+// fecth all post
     const getPosts = () => {
         setLoading(true);
-        axios.get(`https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=20`).then((response) => {
+        axios.get(`https://jsonplaceholder.typicode.com/posts?_page=${page}&_limit=10`).then((response) => {
             if(data?.length > 0) {
                 setData([...data, ...response.data]);
             } else {
                 setData(response.data);
             }
-            console.log(response.headers["x-total-count"]);
             if(error) {
                 setError(null);
             }
@@ -31,16 +31,32 @@ const AllPosts = () => {
         setError(error); }).finally(() => { setLoading(false); });
     }
 
+// useEffect to fetch all post
     useEffect(() => {  
         getPosts()
     }, [page]);
 
-    const handleActivePost = useCallback((id) => { setActivePost(id) }, []);
+// navigate to ViewPost
+    const navigateToViewPost = (id) => navigate('ViewPost', {id})
 
-    const renderItem = ({ item }) => {
-        console.log(activePost, item.id, 'use callback')
+
+// computed details for each item
+    const useComputedDetails = (item) => {
+        return useMemo(() => {
+          const start = Date.now();
+          // Dummy computation
+          const summary = item.title.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          const end = Date.now();
+          console.log(`Computation time for item ${item.id}: ${end - start} milliseconds`);
+          return summary;
+        }, [item]);
+      };
+
+// render item for list of posts
+    const RenderItem = ({ item }) => {
+        useComputedDetails(item);
         return (
-            <TouchableOpacity style={styles.listItems} onPress={() => handleActivePost(item.id)}>
+            <TouchableOpacity style={styles.listItems} onPress={() => navigateToViewPost(item.id)}>
                 <View style={styles.listItemWrapper}>
                 <View style={styles.idContainer}>
                     <Text style={styles.idText}>{item.id}</Text>
@@ -49,24 +65,22 @@ const AllPosts = () => {
                     <Text style={styles.titleText}>{item.title}</Text>
                 </View>
                 </View>
-                    {activePost === item.id ? (
-                        <ViewPost id={item?.id} />
-                    ): null}
             </TouchableOpacity>
         )
     }
 
+// handle on end reached ----> infinite scroll
     const handleOnEndReached = () => {
         setPage(page + 1);
     }
 
     return (
-       <View>
-        <TextInput placeholder="Search" style={styles.textInput} />
+       <View style={styles.container}>
+        <Text style={styles.header}>Bloggo.</Text>
         {error ? <Text style={styles.error}>{error.message}</Text> : null}
         <FlatList
             data={data}
-            renderItem={renderItem}
+            renderItem={({item}) => <RenderItem item={item} />}
             keyExtractor={item => item.id.toString()}
             style={styles.container}
             onEndReached={() => handleOnEndReached()}
@@ -77,10 +91,18 @@ const AllPosts = () => {
     )
 }
 
+
+// styles
 const styles = StyleSheet.create({
+    header: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        paddingVertical: 16
+      },
     container: {
         backgroundColor: '#fff',
-        padding: 24
+        paddingHorizontal: 8,
     },
     error: {
         color: 'red',
